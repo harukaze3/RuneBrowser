@@ -126,6 +126,7 @@ frame:SetPoint("CENTER")
 frame:EnableMouse(true)
 frame:SetMovable(true)
 frame:SetClampedToScreen(true)
+frame:SetHitRectInsets(35, 35, 35, 60)
 frame:Hide()
 
 local function PlayBagSound(open)
@@ -140,11 +141,10 @@ frame:SetScript("OnHide", function() PlayBagSound(false) end)
 UISpecialFrames = UISpecialFrames or {}
 do
     local name = frame:GetName()
-    local found = false
-    for i = 1, #UISpecialFrames do
-        if UISpecialFrames[i] == name then found = true break end
+    for _, v in ipairs(UISpecialFrames) do
+        if v == name then name = nil; break end
     end
-    if not found then table.insert(UISpecialFrames, name) end
+    if name then table.insert(UISpecialFrames, name) end
 end
 
 local cornerTextures = {
@@ -191,14 +191,10 @@ drag:SetPoint("RIGHT", -8, 0)
 drag:SetHeight(67)
 drag:EnableMouse(true)
 drag:SetScript("OnMouseDown", function(self, button)
-    if button == "LeftButton" then
-        frame:StartMoving()
-    end
+    if button == "LeftButton" then frame:StartMoving() end
 end)
 drag:SetScript("OnMouseUp", function(self, button)
-    if button == "LeftButton" then
-        frame:StopMovingOrSizing()
-    end
+    if button == "LeftButton" then frame:StopMovingOrSizing() end
 end)
 
 drag:SetFrameLevel(frame:GetFrameLevel() + 1)
@@ -215,20 +211,25 @@ local dropdown = CreateFrame("Frame", "RuneBrowserFilterDropDown", frame, "UIDro
 dropdown:SetPoint("TOPRIGHT", -35, -40)
 UIDropDownMenu_SetWidth(dropdown, 120)
 local filterState = "UNCOMMON"
+local sortState = "ID_ASC"
+local UpdateList
+
+local filterOptions = {
+    { text = "|cff1eff00Uncommon|r",  value = "UNCOMMON" },
+    { text = "|cff0070ddRare|r",      value = "RARE" },
+    { text = "|cffa335eeEpic|r",      value = "EPIC" },
+    { text = "|cffff8000Legendary|r", value = "LEGENDARY" },
+}
+local filterLabels = {}
+for _, o in ipairs(filterOptions) do filterLabels[o.value] = o.text end
 
 local function Filter_OnClick(self)
     filterState = self.value
     UIDropDownMenu_SetSelectedValue(dropdown, filterState)
+    UIDropDownMenu_SetText(dropdown, filterLabels[filterState])
     CloseDropDownMenus()
     UpdateList()
 end
-
-local filterOptions = {
-    { text = "|cff1eff00Uncommon|r", value = "UNCOMMON" },
-    { text = "|cff0070ddRare|r",    value = "RARE" },
-    { text = "|cffa335eeEpic|r",    value = "EPIC" },
-    { text = "|cffff8000Legendary|r", value = "LEGENDARY" },
-}
 
 local function Filter_Initialize()
     for _, opt in ipairs(filterOptions) do
@@ -243,6 +244,7 @@ end
 
 UIDropDownMenu_Initialize(dropdown, Filter_Initialize)
 UIDropDownMenu_SetSelectedValue(dropdown, "UNCOMMON")
+UIDropDownMenu_SetText(dropdown, filterLabels["UNCOMMON"])
 
 local searchQuery = ""
 local searchBox = CreateFrame("EditBox", "RuneBrowserSearchBox", frame, "InputBoxTemplate")
@@ -274,7 +276,8 @@ searchBox:SetScript("OnTextChanged", function(self)
     UpdateList()
 end)
 local function SearchBox_UpdatePlaceholder(self)
-    if self:GetText() == "" then searchPlaceholder:Show() end
+    if self:GetText() == "" then searchPlaceholder:Show()
+    else searchPlaceholder:Hide() end
 end
 searchBox:SetScript("OnEditFocusGained", SearchBox_UpdatePlaceholder)
 searchBox:SetScript("OnEditFocusLost", SearchBox_UpdatePlaceholder)
@@ -291,14 +294,13 @@ infoBtn:SetSize(20, 20)
 infoBtn:SetPoint("LEFT", searchBox, "RIGHT", 6, 0)
 infoBtn:SetFrameLevel(frame:GetFrameLevel() + 2)
 
-local infoBtnTex = infoBtn:CreateTexture(nil, "ARTWORK")
-infoBtnTex:SetAllPoints()
-infoBtnTex:SetTexture("Interface\\FriendsFrame\\InformationIcon")
-
-local infoBtnHighlight = infoBtn:CreateTexture(nil, "HIGHLIGHT")
-infoBtnHighlight:SetAllPoints()
-infoBtnHighlight:SetTexture("Interface\\FriendsFrame\\InformationIcon")
-infoBtnHighlight:SetAlpha(0.5)
+local t = infoBtn:CreateTexture(nil, "ARTWORK")
+t:SetAllPoints()
+t:SetTexture("Interface\\FriendsFrame\\InformationIcon")
+t = infoBtn:CreateTexture(nil, "HIGHLIGHT")
+t:SetAllPoints()
+t:SetTexture("Interface\\FriendsFrame\\InformationIcon")
+t:SetAlpha(0.5)
 infoBtn:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:ClearLines()
@@ -344,12 +346,8 @@ do
     local function UpdateAngleFromCursor()
         local uiScale = UIParent:GetEffectiveScale()
         local cx, cy = Minimap:GetCenter()
-        local x, y = GetCursorPosition()
-        x = x / uiScale
-        y = y / uiScale
-        local dx = x - cx
-        local dy = y - cy
-        angle = math.atan2(dy, dx)
+        local mx, my = GetCursorPosition()
+        angle = math.atan2(my/uiScale - cy, mx/uiScale - cx)
         if angle < 0 then angle = angle + (2 * math.pi) end
         PositionButton()
     end
@@ -436,7 +434,6 @@ local function ScrollList(delta)
     end
 end
 
-scroll:SetScript("OnMouseWheel", function(self, delta) ScrollList(delta) end)
 frame:EnableMouseWheel(true)
 frame:SetScript("OnMouseWheel", function(self, delta) ScrollList(delta) end)
 
@@ -486,7 +483,19 @@ for i = 1, NUM_ROWS do
         self.text:SetTextColor(1, 1, 1)
         GameTooltip:Hide()
     end)
-    
+    btn:SetScript("OnClick", function(self, button)
+        if button == "LeftButton" and IsShiftKeyDown() then
+            local id = self.spellID
+            if id then
+                local name = GetSpellInfo(id)
+                if name then
+                    local link = "|cff71d5ff|Hspell:"..id.."|h["..name.."]|h|r"
+                    ChatEdit_InsertLink(link)
+                end
+            end
+        end
+    end)
+
     rows[i] = btn
 end
 
@@ -504,6 +513,50 @@ infoTab.text:SetPoint("CENTER", 0, 0)
 infoTab.text:SetTextColor(1, 1, 1)
 infoTab.text:SetText(version.." - made by "..author)
 
+local sortTab = CreateFrame("Button", "RuneBrowserSortTab", frame)
+sortTab:SetSize(160, 32)
+sortTab:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -30, 51)
+sortTab:EnableMouse(false)
+sortTab:SetNormalTexture("Interface\\PaperDollInfoFrame\\UI-Character-ActiveTab")
+
+local sortDropdown
+
+local sortOptions = {
+    { text = "ID Ascending",  value = "ID_ASC" },
+    { text = "ID Descending", value = "ID_DESC" },
+    { text = "A-Z",           value = "A_Z" },
+    { text = "Z-A",           value = "Z_A" },
+}
+local sortLabels = {}
+for _, o in ipairs(sortOptions) do sortLabels[o.value] = o.text end
+
+local function Sort_OnClick(self)
+    sortState = self.value
+    UIDropDownMenu_SetSelectedValue(sortDropdown, sortState)
+    UIDropDownMenu_SetText(sortDropdown, sortLabels[sortState])
+    CloseDropDownMenus()
+    UpdateList()
+end
+
+local function Sort_Initialize()
+    for _, opt in ipairs(sortOptions) do
+        local info = UIDropDownMenu_CreateInfo()
+        info.func = Sort_OnClick
+        info.text = opt.text
+        info.value = opt.value
+        info.checked = (sortState == opt.value)
+        UIDropDownMenu_AddButton(info)
+    end
+end
+
+sortDropdown = CreateFrame("Frame", "RuneBrowserSortDropDown", frame, "UIDropDownMenuTemplate")
+sortDropdown:SetPoint("CENTER", sortTab, "CENTER", 0, 0)
+sortDropdown:SetFrameLevel(frame:GetFrameLevel() + 2)
+UIDropDownMenu_SetWidth(sortDropdown, 110)
+UIDropDownMenu_Initialize(sortDropdown, Sort_Initialize)
+UIDropDownMenu_SetSelectedValue(sortDropdown, "ID_ASC")
+UIDropDownMenu_SetText(sortDropdown, "ID Ascending")
+
 local spellSources = {
     UNCOMMON = spellsUncommon,
     RARE = spellsRare,
@@ -511,13 +564,22 @@ local spellSources = {
     LEGENDARY = spellsLegendary,
 }
 
+local sortFns = {
+    ID_ASC  = function(a, b) return a < b end,
+    ID_DESC = function(a, b) return a > b end,
+    A_Z = function(a, b)
+        return (GetSpellInfo(a) or ""):lower() < (GetSpellInfo(b) or ""):lower()
+    end,
+    Z_A = function(a, b)
+        return (GetSpellInfo(a) or ""):lower() > (GetSpellInfo(b) or ""):lower()
+    end,
+}
+
 local function RebuildFilteredList()
     filteredList = {}
     local source = spellSources[filterState] or spellsUncommon
     if #source == 0 then
-        if searchQuery == "" then
-            table.insert(filteredList, { type = "wip", text = "Work In Progress" })
-        end
+        table.insert(filteredList, { type = "wip", text = "Work In Progress" })
         return
     end
     for _, id in ipairs(source) do
@@ -530,9 +592,12 @@ local function RebuildFilteredList()
             end
         end
     end
+    if sortFns[sortState] then
+        table.sort(filteredList, sortFns[sortState])
+    end
 end
 
-local function UpdateList()
+UpdateList = function()
     RebuildFilteredList()
     local offset = FauxScrollFrame_GetOffset(scroll)
     local num = #filteredList
@@ -549,13 +614,12 @@ local function UpdateList()
                 btn.idLabel:Hide()
                 btn.idText:SetText("")
             else
-                local id = entry
-                local name, _, icon = GetSpellInfo(id)
-                btn.spellID = id
+                local name, _, icon = GetSpellInfo(entry)
+                btn.spellID = entry
                 btn.icon:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
-                btn.text:SetText(name or ("["..tostring(id).."]"))
+                btn.text:SetText(name or ("["..tostring(entry).."]"))
                 btn.idLabel:Show()
-                btn.idText:SetText(tostring(id))
+                btn.idText:SetText(tostring(entry))
             end
             btn.text:SetTextColor(1,1,1)
             btn.icon:SetVertexColor(1,1,1)
@@ -569,10 +633,11 @@ local function UpdateList()
     local focus = GetMouseFocus()
     if focus then
         for i = 1, NUM_ROWS do
-            if rows[i] == focus then
-                local id = rows[i].spellID
+            local btn = rows[i]
+            if btn == focus then
+                local id = btn.spellID
                 if id then
-                    GameTooltip:SetOwner(rows[i], "ANCHOR_CURSOR")
+                    GameTooltip:SetOwner(btn, "ANCHOR_CURSOR")
                     GameTooltip:ClearLines()
                     GameTooltip:SetHyperlink("spell:"..id)
                     GameTooltip:Show()
@@ -585,18 +650,12 @@ local function UpdateList()
     end
 end
 
-_G.UpdateList = UpdateList
-
-local function RuneBrowser_Toggle()
+SLASH_RUNEBROWSER1 = "/runebrowser"
+SlashCmdList["RUNEBROWSER"] = function()
     if frame:IsShown() then frame:Hide()
     else UpdateList() frame:Show() end
 end
 
-SLASH_RUNEBROWSER1 = "/runebrowser"
-SlashCmdList["RUNEBROWSER"] = RuneBrowser_Toggle
-
 scroll:SetScript("OnVerticalScroll", function(self, offset)
     FauxScrollFrame_OnVerticalScroll(self, offset, ROW_HEIGHT, UpdateList)
 end)
-
-UpdateList()
