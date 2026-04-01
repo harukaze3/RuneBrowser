@@ -250,6 +250,7 @@ searchBox:SetSize(160, 20)
 searchBox:SetPoint("TOPLEFT", 85, -45)
 searchBox:SetAutoFocus(false)
 searchBox:SetMaxLetters(50)
+searchBox:SetFrameLevel(frame:GetFrameLevel() + 2)
 
 local searchIcon = frame:CreateTexture(nil, "ARTWORK")
 searchIcon:SetSize(16, 16)
