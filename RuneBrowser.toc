@@ -1,0 +1,8 @@
+## Interface: 30300
+## Title: RuneBrowser
+## Notes: RuneBrowser will show you all known and unknown runes |cff999999(v1.1)|r
+## Author: Haruka
+## Version: v1.1
+## SavedVariables: RuneBrowserDB
+
+RuneBrowser.lua
