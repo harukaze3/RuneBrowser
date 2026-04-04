@@ -1,0 +1,8 @@
+## Interface: 30300
+## Title: RuneBrowser
+## Notes: RuneBrowser will show you all currently existing runes withing GrimfallWoW |cff999999(v1.2.1)|r
+## Author: Haruka
+## Version: v1.2.1
+## SavedVariables: RuneBrowserDB
+
+RuneBrowser.lua
